@@ -7,8 +7,10 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct Results {
-    ldap_res: Vec<Vec<String>>,
-    ad_res: Vec<Vec<String>>,
+    ldap_attrs: Vec<String>,
+    ad_attrs: Vec<String>,
+    ldap_res: Vec<HashMap<String, Vec<String>>>,
+    ad_res: Vec<HashMap<String, Vec<String>>>,
 }
 
 
@@ -16,48 +18,15 @@ pub struct Results {
 async fn search_results(filter: String) -> Results {
     let settings_filename = "../conf.toml";
     let  con = Connexions::new(settings_filename);
-    let ldap_attrs = &con.conf.ldap.attrs_search;
-
+    let ldap_attrs = con.conf.ldap.attrs_search.clone();
+    let ad_attrs = con.conf.ad.attrs_search.clone();
     let (ldap_res, ad_res) = con.search(filter).await;
-    let ad_attrs = &con.conf.ad.attrs_search;   
-    let res_ldap = format_data(&ldap_attrs, ldap_res);
-    let res_ad = format_data(&ad_attrs, ad_res);
-
-    let res = Results {
-        ldap_res: res_ldap,
-        ad_res: res_ad,
-    };
-    res
-}
-
-fn format_data(attrs: &Vec<String>, res: Vec<HashMap<String, Vec<String>>>) -> Vec<Vec<String>> {
-    let mut lines = Vec::new();
-    lines.push(attrs.clone());
-    if res.len() > 0 {
-        for line in res.into_iter() {
-            let mut values_line = vec!();
-            for attr in attrs.into_iter() {
-                if line.contains_key(attr) {
-                    let vct = &line[attr];
-                    let mut vals = vct[0].clone();
-                    let l = vct.len();
-                    if l > 1 {
-                        for i in 1..l {
-                            let val = &vct[i];
-                            vals = vals + "\n" + val;
-                        }
-                    }
-                    values_line.push(vals);
-                } 
-                else {
-                    let empty = String::from("<vide>");
-                    values_line.push(empty);
-                } 
-            }
-            lines.push(values_line);
-        }
+    Results { 
+        ldap_attrs,
+        ad_attrs,
+        ldap_res,  
+        ad_res
     }
-    lines
 }
 
 
