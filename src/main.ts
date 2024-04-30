@@ -18,27 +18,47 @@ async function search() {
     }
 }
 
+// cherche l'entrée précise dans l'annuaire demandé
+async function searchEntry(annuary: string, e: Event) {
+    console.log(annuary, e);
+}
+
 
 function displayResults(results: Results) {
     let resElem = document.querySelector('#resultats');
     if (resElem) {
-        let resultsHtml = displayList(results.ldap_attrs, results.ldap_res) + displayList(results.ad_attrs, results.ad_res);
-        resElem.innerHTML = resultsHtml;      
+        let resultsHtml = '<table><tr><td>';
+        resultsHtml = resultsHtml + displayList("ldap", results.ldap_attrs, results.ldap_res) + '</td><td>' + displayList("ad", results.ad_attrs, results.ad_res);
+        resultsHtml = resultsHtml + '</td></tr></table>'
+        resElem.innerHTML = resultsHtml; 
+        let elemListLdap = document.querySelector('#ldap');  // on associe un callback onclick
+        elemListLdap?.addEventListener('click', (e) => { searchEntry('ldap', e);});     
+        let elemListAd = document.querySelector('#ad');     // on associe un callback onclick
+        elemListAd?.addEventListener('click', (e) => { searchEntry('ad', e);});  
     }
 }
 
-function displayList(attrs: [string], data: []): string {
-    let listHtml = '<div>';
+function displayList(className: string, attrs: [string], data: []): string {
+    let listHtml = '<div class="resultCol" id="' + className +'"><table class="' + className +'">';
+    // chaque ligne de résultat aura un id = className+uid
+    let id_attr = attrs[attrs.length - 1]; // le dernier attribut est l'identifiant
+
+    // on ne prend pas en compte le dernier attribut identifiant (non affiché)
     // header
-    listHtml = listHtml + '<div class="header">';
-    for (let h = 0; h < attrs.length; h++) {
-        listHtml = listHtml + '<span>' + attrs[h] + '</span>';
+    listHtml = listHtml + '<thead><tr class="header">';
+    for (let h = 0; h < attrs.length - 1; h++) {
+        listHtml = listHtml + '<th>' + attrs[h] + '</th>';
     }
-    listHtml = listHtml + '</div><br/><div>';
+    listHtml = listHtml + '</tr></thead>';
     // data
+    listHtml = listHtml + '<tbody>';
     for (let i = 0;  i < data.length; i++) {
         let line = data[i];
-        attrs.forEach(attr => {
+        let val_uid = line[id_attr];
+        let elem_id = className + '+' + val_uid;
+        listHtml = listHtml + '<tr class="line" id="' + elem_id + '">';
+        for (let iat = 0; iat < attrs.length - 1; iat++)  {
+            let attr = attrs[iat];
             let vct: [string] = line[attr];
             let val: string = '';
             if (vct && vct.length > 0) {
@@ -47,11 +67,11 @@ function displayList(attrs: [string], data: []): string {
                     val = "\n" + vct[i];
                 }
             }
-            listHtml = listHtml + '<span>' + val + '</span>';
-        });
-        listHtml = listHtml + '</div><br/>';
+            listHtml = listHtml + '<td>' + val + '</td>';
+        };
+        listHtml = listHtml + '</tr>';
     }
-    listHtml = listHtml + '</div>';
+    listHtml = listHtml + '</tbody></table></div>';
     return listHtml;
 }
 
