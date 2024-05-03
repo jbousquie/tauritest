@@ -10,17 +10,25 @@ interface Results {
 
 let inputEl: HTMLInputElement | null;
 
-async function search() {
+async function search(inputEl: HTMLInputElement|null) {
     if (inputEl) {
       let results: Results = await invoke("search_results", { filter: inputEl.value, });
-      //console.log(results);
       displayResults(results);
     }
 }
 
 // cherche l'entrée précise dans l'annuaire demandé
 async function searchEntry(annuary: string, e: Event) {
-    console.log(annuary, e);
+    // l'élément cliqué est un <td>, on va donc chercher son parent pour trouver l'id sous la forme "+ldap+uid"
+    if (e) {
+        let td: HTMLElement = e.target;
+        let tr_id: string = td.parentElement?.id || '';
+        let prefix: string = '+' + annuary + '+';
+        let uid: string = tr_id.replace(prefix, '').replace('"', '');      // on retire le préfixe "+ldap+" ou "+ad+"
+
+        //displayList(annuary, uid);
+    }
+
 }
 
 
@@ -31,11 +39,17 @@ function displayResults(results: Results) {
         resultsHtml = resultsHtml + displayList("ldap", results.ldap_attrs, results.ldap_res) + '</td><td>' + displayList("ad", results.ad_attrs, results.ad_res);
         resultsHtml = resultsHtml + '</td></tr></table>'
         resElem.innerHTML = resultsHtml; 
-        let elemListLdap = document.querySelector('#ldap');  // on associe un callback onclick
-        elemListLdap?.addEventListener('click', (e) => { searchEntry('ldap', e);});     
-        let elemListAd = document.querySelector('#ad');     // on associe un callback onclick
-        elemListAd?.addEventListener('click', (e) => { searchEntry('ad', e);});  
+        registerTableEvent('ldap');
+        registerTableEvent('ad');
     }
+}
+
+// enregistre les listeners click sur la table voulue
+function registerTableEvent(tableId: string) {
+    let elemDiv = document.querySelector('#'+tableId);
+    let elemTable = elemDiv?.childNodes[0];         // <table>
+    let elemTBody = elemTable?.childNodes[1];       // <tbody>
+    elemTBody?.addEventListener('click', (e) => { searchEntry(tableId, e); });
 }
 
 function displayList(className: string, attrs: [string], data: []): string {
@@ -55,7 +69,7 @@ function displayList(className: string, attrs: [string], data: []): string {
     for (let i = 0;  i < data.length; i++) {
         let line = data[i];
         let val_uid = line[id_attr];
-        let elem_id = className + '+' + val_uid;
+        let elem_id = '+' + className + '+' + val_uid;   // on ajoute devant l'uid "+ad+" ou "+ldap+"
         listHtml = listHtml + '<tr class="line" id="' + elem_id + '">';
         for (let iat = 0; iat < attrs.length - 1; iat++)  {
             let attr = attrs[iat];
@@ -77,5 +91,7 @@ function displayList(className: string, attrs: [string], data: []): string {
 
 window.addEventListener("DOMContentLoaded", () => {
     inputEl = document.querySelector("#input");
-    inputEl?.addEventListener("change", (e) => { search(); });
+    if (inputEl) {
+        inputEl.addEventListener("change", () => { search(inputEl); });
+    }
 });

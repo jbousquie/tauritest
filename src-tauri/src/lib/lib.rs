@@ -17,9 +17,12 @@ pub mod ldap {
         pub attrs: Vec<String>
     }
 
+    #[derive(PartialEq)]
     pub enum Mode {
         Display,        // mode affichage d'une fiche entry
-        Search          // mode recherche d'une liste d'entries
+        Search,         // mode recherche d'une liste d'entries
+        DisplayLdap,    // mode affichage d'une fiche entry LDAP uniquement
+        DisplayAd,      // mode affichage d'une fiche entry AD uniquement
     }
 
     pub struct Connexions {
@@ -40,8 +43,11 @@ pub mod ldap {
         // si le mode est Display, les attributs utilisés sont les attrs_display de la conf toml et le add_filter est une recherche précise sur un id
         pub fn request_for(&self, ldap_settings: &LdapSettings, mode: &Mode, add_filter_string: &String) -> MyLdapRequest {
             let filter = ldap_settings.filter.clone();
+            let attr_id = ldap_settings.attr_id.clone();
             let (attrs, final_filter) = match mode {
-                Mode::Display => (ldap_settings.attrs_display.clone(), format!("(&(uid={}){})", add_filter_string, filter)),
+                Mode::Display => (ldap_settings.attrs_display.clone(), format!("(&({}={}){})", attr_id, add_filter_string, filter)),
+                Mode::DisplayLdap => (ldap_settings.attrs_display.clone(), format!("(&({}={}){})", attr_id, add_filter_string, filter)),
+                Mode::DisplayAd => (ldap_settings.attrs_display.clone(), format!("(&({}={}){})", attr_id, add_filter_string, filter)),
                 Mode::Search => (ldap_settings.attrs_search.clone(), format!("(&(displayName=*{}*){})", add_filter_string, filter))
             };
             MyLdapRequest {
@@ -89,37 +95,42 @@ pub mod ldap {
 
 
         // renvoie une liste de users en mode Search
-        pub async fn search(&self, add_filter: String) -> (Vec<HashMap<String, Vec<String>>>, Vec<HashMap<String, Vec<String>>>) {
+        pub async fn search(&self, add_filter: String) -> Vec<Vec<HashMap<String, Vec<String>>>> {
            self.fetch_users(add_filter, Mode::Search).await
         }
 
         // renvoie une liste de users en mode Display (un user attendu, recherché par attr_id)
-        pub async fn display(&self, add_filter: String) -> (Vec<HashMap<String, Vec<String>>>, Vec<HashMap<String, Vec<String>>>) {
+        pub async fn display(&self, add_filter: String) -> Vec<Vec<HashMap<String, Vec<String>>>> {
             self.fetch_users(add_filter, Mode::Display).await
         }
 
-        // Renvoie un tuple de vec de users
-        pub async fn fetch_users(&self, add_filter: String, mode: Mode) -> (Vec<HashMap<String, Vec<String>>>, Vec<HashMap<String, Vec<String>>>) {
+        // Renvoie un Vec de vec de users
+        pub async fn fetch_users(&self, add_filter: String, mode: Mode) -> Vec<Vec<HashMap<String, Vec<String>>>> {
             let conf = &self.conf;
             let conf_ldap = &conf.ldap;
             let conf_ad = &conf.ad;
-            let ldap_request = self.request_for(conf_ldap, &mode, &add_filter);
-            let ad_request = self.request_for(conf_ad, &mode, &add_filter);
-        
-            let ldap_res: Result<Vec<HashMap<String, Vec<String>>>, LdapError> = self.get_users(&ldap_request).await;
-            let ad_res: Result<Vec<HashMap<String, Vec<String>>>, LdapError> = self.get_users(&ad_request).await;
+            let mut vec_res: Vec<Vec<HashMap<String, Vec<String>>>> = Vec::new();
+            if mode != Mode::DisplayAd {
+                let ldap_request = self.request_for(conf_ldap, &mode, &add_filter);
+                let ldap_res: Result<Vec<HashMap<String, Vec<String>>>, LdapError> = self.get_users(&ldap_request).await;
+                let ldap_users: Vec<HashMap<String, Vec<String>>> = match ldap_res {
+                    Ok(users) => users,
+                    Err(_error) => vec![HashMap::from([("Erreur accès LDAP".to_string(), vec![])])],
+                };
+                vec_res.push(ldap_users);
+            }
 
-            let ldap_users: Vec<HashMap<String, Vec<String>>> = match ldap_res {
-                Ok(users) => users,
-                Err(_error) => vec![HashMap::from([("Erreur accès LDAP".to_string(), vec![])])],
-            };
 
-            let ad_users = match ad_res {
-                Ok(users) => users,
-                Err(_error) => vec![HashMap::from([("Erreur accès AD".to_string(), vec![])])],
-            };
-        
-            (ldap_users, ad_users)        
+            if mode != Mode::DisplayLdap {
+                let ad_request = self.request_for(conf_ad, &mode, &add_filter);
+                let ad_res: Result<Vec<HashMap<String, Vec<String>>>, LdapError> = self.get_users(&ad_request).await;
+                let ad_users = match ad_res {
+                    Ok(users) => users,
+                    Err(_error) => vec![HashMap::from([("Erreur accès AD".to_string(), vec![])])],
+                };
+                vec_res.push(ad_users);
+            }
+            vec_res      
         }
     }
  }
