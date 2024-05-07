@@ -9,6 +9,8 @@ interface Results {
 }
 
 let inputEl: HTMLInputElement | null;
+let backButton: HTMLButtonElement | null;
+let lastHtml: string;
 
 async function search(inputEl: HTMLInputElement|null) {
     if (inputEl) {
@@ -43,11 +45,12 @@ async function searchEntry(directory: string, e: Event) {
     }
 }
 
-function displayEntry(directory: string, attrs: string[], entry: []) {
+function displayEntry(directory: string, attrs: string[], entry: {}[]) {
     let resElem = document.querySelector('#resultats');
     if (resElem) {
-        let resultsHtml = displayList(directory, attrs, entry);
-        resElem.innerHTML = resultsHtml; 
+        let entryHtml = displayAttrs(directory, attrs, entry[0]);
+        lastHtml = resElem.innerHTML;
+        resElem.innerHTML = entryHtml; 
     }
 }
 
@@ -56,7 +59,8 @@ function displayResults(results: Results) {
     if (resElem) {
         let resultsHtml = '<table><tr><td>';
         resultsHtml = resultsHtml + displayList("ldap", results.ldap_attrs, results.ldap_res) + '</td><td>' + displayList("ad", results.ad_attrs, results.ad_res);
-        resultsHtml = resultsHtml + '</td></tr></table>'
+        resultsHtml = resultsHtml + '</td></tr></table>';
+        lastHtml = resElem.innerHTML;
         resElem.innerHTML = resultsHtml; 
         registerTableEvent('ldap');
         registerTableEvent('ad');
@@ -80,6 +84,25 @@ function cleanAttrs(attrs: string[], resultLine: {}) {
     return cleaned
 }
 
+// Affiche les attributs/valeurs d'une entrée en lignes
+// Renvoie un contenu html
+function displayAttrs(className: String, attrs: string[], entry: { [key: string]: string[] }): string {
+    if (backButton) {
+        backButton.disabled = false;
+    }
+    attrs = cleanAttrs(attrs, entry);
+    let entryHtml = '<div class="resultCol" id="' + className +'"><table class="' + className +'"><tbody>';
+    for (let i = 0; i < attrs.length - 1; i++) {
+        let attr = attrs[i];
+        let val = entry[attr];
+        entryHtml = entryHtml + '<tr><td>' + attr + '</td><td>' + val + '</td></tr>';
+    }
+    entryHtml = entryHtml + '</tbody></table></div>';
+    return entryHtml
+}
+
+// Affiche une liste de résultats en colonne
+// Renvoie un contenu html
 function displayList(className: string, attrs: string[], data: {}[]): string {
     let listHtml = '<div class="resultCol" id="' + className +'"><table class="' + className +'">';
     if (data.length > 0) {
@@ -122,9 +145,25 @@ function displayList(className: string, attrs: string[], data: {}[]): string {
     return listHtml;
 }
 
+function back(backButton: HTMLButtonElement|null) {
+    if (backButton) {
+        let resElem = document.querySelector('#resultats');
+        if (resElem) {
+            resElem.innerHTML = lastHtml;
+            backButton.disabled = true;
+            registerTableEvent('ldap');
+            registerTableEvent('ad');
+        }       
+    }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
     inputEl = document.querySelector("#input");
     if (inputEl) {
         inputEl.addEventListener("change", () => { search(inputEl); });
+    }
+    backButton = document.querySelector("#back");
+    if (backButton) {
+        backButton.addEventListener("click", () => { back(backButton); })
     }
 });

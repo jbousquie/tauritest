@@ -92,4 +92,15 @@ td {
 #input {
   position: sticky;
   top: 0px;
+  width: 50%;
 }
+
+#back {
+  position: sticky;
+  top: 0px;
+  /* right: 20px; */
+  width: 60px;
+  height: 40px;
+  align-self: flex-end;
+}
+
