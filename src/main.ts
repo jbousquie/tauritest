@@ -18,19 +18,38 @@ async function search(inputEl: HTMLInputElement|null) {
 }
 
 // cherche l'entrée précise dans l'annuaire demandé
-async function searchEntry(annuary: string, e: Event) {
+async function searchEntry(directory: string, e: Event) {
     // l'élément cliqué est un <td>, on va donc chercher son parent pour trouver l'id sous la forme "+ldap+uid"
     if (e) {
-        let td: HTMLElement = e.target;
-        let tr_id: string = td.parentElement?.id || '';
-        let prefix: string = '+' + annuary + '+';
-        let uid: string = tr_id.replace(prefix, '').replace('"', '');      // on retire le préfixe "+ldap+" ou "+ad+"
+        let td = e.target as HTMLElement;
+        if (td) {
+            let tr_id: string = td.parentElement?.id || '';
+            let prefix: string = '+' + directory + '+';
+            let uid: string = tr_id.replace(prefix, '').replace('"', '');      // on retire le préfixe "+ldap+" ou "+ad+"
+            let result: Results = await invoke("search_entry", { directory: directory, filter: uid, });
 
-        //displayList(annuary, uid);
+            let attrs: [string];
+            let entry;
+            if (directory == "ad") {
+                attrs = result.ad_attrs;
+                entry = result.ad_res;
+            }
+            else {
+                attrs = result.ldap_attrs;
+                entry = result.ldap_res;
+            }   
+            displayEntry(directory, attrs, entry);
+        }
     }
-
 }
 
+function displayEntry(directory: string, attrs: [string], entry: []) {
+    let resElem = document.querySelector('#resultats');
+    if (resElem) {
+        let resultsHtml = displayList(directory, attrs, entry);
+        resElem.innerHTML = resultsHtml; 
+    }
+}
 
 function displayResults(results: Results) {
     let resElem = document.querySelector('#resultats');
@@ -52,8 +71,21 @@ function registerTableEvent(tableId: string) {
     elemTBody?.addEventListener('click', (e) => { searchEntry(tableId, e); });
 }
 
+// si les attributs contiennent "*" alors on renvoie les attributs de la ligne de résultat à la place
+function cleanAttrs(attrs, resultLine) {
+    let cleaned = attrs;
+    if (attrs.includes("*")) {
+        cleaned = Object.keys(resultLine);
+    }
+    return cleaned
+}
+
 function displayList(className: string, attrs: [string], data: []): string {
     let listHtml = '<div class="resultCol" id="' + className +'"><table class="' + className +'">';
+    if (data.length > 0) {
+        attrs = cleanAttrs(attrs, data[0]);
+    }
+    
     // chaque ligne de résultat aura un id = className+uid
     let id_attr = attrs[attrs.length - 1]; // le dernier attribut est l'identifiant
 
@@ -63,7 +95,8 @@ function displayList(className: string, attrs: [string], data: []): string {
     for (let h = 0; h < attrs.length - 1; h++) {
         listHtml = listHtml + '<th>' + attrs[h] + '</th>';
     }
-    listHtml = listHtml + '</tr></thead>';
+    listHtml = listHtml + '</tr></thead>';    
+
     // data
     listHtml = listHtml + '<tbody>';
     for (let i = 0;  i < data.length; i++) {

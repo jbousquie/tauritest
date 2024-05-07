@@ -74,7 +74,6 @@ pub mod ldap {
                 ldap3::drive!(conn);
                 ldap.simple_bind(&ldap_request.bind_dn, &ldap_request.bind_pw).await?;
 
-
                 let mut rs = ldap.streaming_search_with(
                     adapters,
                     &ldap_request.base,
@@ -104,12 +103,23 @@ pub mod ldap {
             self.fetch_users(add_filter, Mode::Display).await
         }
 
+        // renvoie une liste de users en mode DisplayLdap (un user attendu, recherché par attr_id)
+        pub async fn display_ldap(&self, add_filter: String) -> Vec<Vec<HashMap<String, Vec<String>>>> {
+            self.fetch_users(add_filter, Mode::DisplayLdap).await
+        }
+
+        // renvoie une liste de users en mode DisplayAd (un user attendu, recherché par attr_id)
+        pub async fn display_ad(&self, add_filter: String) -> Vec<Vec<HashMap<String, Vec<String>>>> {
+            self.fetch_users(add_filter, Mode::DisplayAd).await
+        }
+
         // Renvoie un Vec de vec de users
         pub async fn fetch_users(&self, add_filter: String, mode: Mode) -> Vec<Vec<HashMap<String, Vec<String>>>> {
             let conf = &self.conf;
             let conf_ldap = &conf.ldap;
             let conf_ad = &conf.ad;
             let mut vec_res: Vec<Vec<HashMap<String, Vec<String>>>> = Vec::new();
+
             if mode != Mode::DisplayAd {
                 let ldap_request = self.request_for(conf_ldap, &mode, &add_filter);
                 let ldap_res: Result<Vec<HashMap<String, Vec<String>>>, LdapError> = self.get_users(&ldap_request).await;
@@ -119,7 +129,6 @@ pub mod ldap {
                 };
                 vec_res.push(ldap_users);
             }
-
 
             if mode != Mode::DisplayLdap {
                 let ad_request = self.request_for(conf_ad, &mode, &add_filter);
