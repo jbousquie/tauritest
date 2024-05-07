@@ -2,8 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 
 
 interface Results {
-    ldap_attrs: [string];
-    ad_attrs: [string];
+    ldap_attrs: string[];
+    ad_attrs: string[];
     ldap_res: [];
     ad_res: [];
 }
@@ -28,7 +28,7 @@ async function searchEntry(directory: string, e: Event) {
             let uid: string = tr_id.replace(prefix, '').replace('"', '');      // on retire le préfixe "+ldap+" ou "+ad+"
             let result: Results = await invoke("search_entry", { directory: directory, filter: uid, });
 
-            let attrs: [string];
+            let attrs: string[];
             let entry;
             if (directory == "ad") {
                 attrs = result.ad_attrs;
@@ -43,7 +43,7 @@ async function searchEntry(directory: string, e: Event) {
     }
 }
 
-function displayEntry(directory: string, attrs: [string], entry: []) {
+function displayEntry(directory: string, attrs: string[], entry: []) {
     let resElem = document.querySelector('#resultats');
     if (resElem) {
         let resultsHtml = displayList(directory, attrs, entry);
@@ -72,7 +72,7 @@ function registerTableEvent(tableId: string) {
 }
 
 // si les attributs contiennent "*" alors on renvoie les attributs de la ligne de résultat à la place
-function cleanAttrs(attrs, resultLine) {
+function cleanAttrs(attrs: string[], resultLine: {}) {
     let cleaned = attrs;
     if (attrs.includes("*")) {
         cleaned = Object.keys(resultLine);
@@ -80,7 +80,7 @@ function cleanAttrs(attrs, resultLine) {
     return cleaned
 }
 
-function displayList(className: string, attrs: [string], data: []): string {
+function displayList(className: string, attrs: string[], data: {}[]): string {
     let listHtml = '<div class="resultCol" id="' + className +'"><table class="' + className +'">';
     if (data.length > 0) {
         attrs = cleanAttrs(attrs, data[0]);
@@ -100,13 +100,13 @@ function displayList(className: string, attrs: [string], data: []): string {
     // data
     listHtml = listHtml + '<tbody>';
     for (let i = 0;  i < data.length; i++) {
-        let line = data[i];
+        let line: { [key: string]: string[] } = data[i];
         let val_uid = line[id_attr];
         let elem_id = '+' + className + '+' + val_uid;   // on ajoute devant l'uid "+ad+" ou "+ldap+"
         listHtml = listHtml + '<tr class="line" id="' + elem_id + '">';
         for (let iat = 0; iat < attrs.length - 1; iat++)  {
             let attr = attrs[iat];
-            let vct: [string] = line[attr];
+            let vct: string[] = line[attr];
             let val: string = '';
             if (vct && vct.length > 0) {
                 val = vct[0];
