@@ -16,7 +16,7 @@ pub struct Results {
 
 #[tauri::command]
 async fn search_results(filter: String) -> Results {
-    let settings_filename = "../conf.toml";
+    let settings_filename = "./conf.toml";
     let  con = Connexions::new(settings_filename);
     let ldap_attrs = con.conf.ldap.attrs_search.clone();
     let ad_attrs = con.conf.ad.attrs_search.clone();
@@ -32,7 +32,7 @@ async fn search_results(filter: String) -> Results {
 
 #[tauri::command]
 async fn search_entry(directory: String, filter: String) -> Results {
-    let settings_filename = "../conf.toml";
+    let settings_filename = "./conf.toml";
     let  con = Connexions::new(settings_filename);
     let vec_res: Vec<Vec<HashMap<String, Vec<String>>>>;
     let ldap_attrs;

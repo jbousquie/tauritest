@@ -27,3 +27,4 @@ src/target
 *.lock
 
 conf.toml
+src-tauri/conf.toml
