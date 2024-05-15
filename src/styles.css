@@ -104,3 +104,10 @@ td {
   align-self: flex-end;
 }
 
+.leftalgn {
+  text-align: left;
+}
+
+.rightalgn {
+  text-align: right;
+}

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { PhysicalSize, getCurrent } from "@tauri-apps/api/window";
 
 
 interface Results {
@@ -11,7 +12,10 @@ interface Results {
 let inputEl: HTMLInputElement | null;
 let backButton: HTMLButtonElement | null;
 let lastHtml: string;
+let lastWidth: number;
 
+// cherche les résultats correspondant au filtre dans LDAP et AD
+// appelle l'affichage des résultats
 async function search(inputEl: HTMLInputElement|null) {
     if (inputEl) {
       let results: Results = await invoke("search_results", { filter: inputEl.value, });
@@ -20,6 +24,7 @@ async function search(inputEl: HTMLInputElement|null) {
 }
 
 // cherche l'entrée précise dans l'annuaire demandé
+// appelle l'affichage de l'entrée
 async function searchEntry(directory: string, e: Event) {
     // l'élément cliqué est un <td>, on va donc chercher son parent pour trouver l'id sous la forme "+ldap+uid"
     if (e) {
@@ -45,25 +50,36 @@ async function searchEntry(directory: string, e: Event) {
     }
 }
 
+// Affiche l'entrée à l'écran
 function displayEntry(directory: string, attrs: string[], entry: {}[]) {
     let resElem = document.querySelector('#resultats');
     if (resElem) {
         let entryHtml = displayAttrs(directory, attrs, entry[0]);
         lastHtml = resElem.innerHTML;
-        resElem.innerHTML = entryHtml; 
+        resElem.innerHTML = entryHtml.html; 
+        let width = (entryHtml.lineLen + 40) * 16;
+        adjustWidth(width);
     }
 }
 
+// Affiche les deux colonnes de résultats à l'écran (LDAP + AD)
 function displayResults(results: Results) {
     let resElem = document.querySelector('#resultats');
     if (resElem) {
         let resultsHtml = '<table><tr><td>';
-        resultsHtml = resultsHtml + displayList("ldap", results.ldap_attrs, results.ldap_res) + '</td><td>' + displayList("ad", results.ad_attrs, results.ad_res);
+        let resLdap = displayList("ldap", results.ldap_attrs, results.ldap_res);
+        let resAd = displayList("ad", results.ad_attrs, results.ad_res);
+        resultsHtml = resultsHtml + resLdap.html + '</td><td>' + resAd.html ;
         resultsHtml = resultsHtml + '</td></tr></table>';
         lastHtml = resElem.innerHTML;
         resElem.innerHTML = resultsHtml; 
         registerTableEvent('ldap');
         registerTableEvent('ad');
+        let ldapLen = resLdap.lineLen;
+        let adLen = resAd.lineLen;
+        let width = (ldapLen + adLen + 20) * 16;
+        lastWidth = width;
+        adjustWidth(width);
     }
 }
 
@@ -84,31 +100,39 @@ function cleanAttrs(attrs: string[], resultLine: {}) {
     return cleaned
 }
 
-// Affiche les attributs/valeurs d'une entrée en lignes
-// Renvoie un contenu html
-function displayAttrs(className: String, attrs: string[], entry: { [key: string]: string[] }): string {
+// Affiche les attributs/valeurs d'une Entrée sous forme de lignes
+// Renvoie un contenu html et une longuer max de ligne (en nb de caractères)
+function displayAttrs(className: String, attrs: string[], entry: { [key: string]: string[] }): {html: string; lineLen: number} {
     if (backButton) {
         backButton.disabled = false;
     }
+    let maxAtt = 0;
+    let maxVal = 0;
     attrs = cleanAttrs(attrs, entry);
     let entryHtml = '<div class="resultCol" id="' + className +'"><table class="' + className +'"><tbody>';
     for (let i = 0; i < attrs.length - 1; i++) {
         let attr = attrs[i];
         let val = entry[attr];
-        entryHtml = entryHtml + '<tr><td>' + attr + '</td><td>' + val + '</td></tr>';
+        let attLen = [...attr].length;  // pour avoir le nb de caractères
+        let valLen = [...val].length;
+        if (maxAtt < attLen) { maxAtt = attLen; }
+        if (maxVal <  valLen) { maxVal = valLen; }
+        entryHtml = entryHtml + '<tr><td class="rightalgn">' + attr + '</td><td class="leftalgn">' + val + '</td></tr>';
     }
     entryHtml = entryHtml + '</tbody></table></div>';
-    return entryHtml
+    let maxLine = maxAtt + maxVal;
+    return {html: entryHtml, lineLen: maxLine};
 }
 
 // Affiche une liste de résultats en colonne
 // Renvoie un contenu html
-function displayList(className: string, attrs: string[], data: {}[]): string {
+function displayList(className: string, attrs: string[], data: {}[]): {html: string; lineLen: number} {
     let listHtml = '<div class="resultCol" id="' + className +'"><table class="' + className +'">';
     if (data.length > 0) {
         attrs = cleanAttrs(attrs, data[0]);
     }
-    
+    let maxLen = 0;
+
     // chaque ligne de résultat aura un id = className+uid
     let id_attr = attrs[attrs.length - 1]; // le dernier attribut est l'identifiant
 
@@ -116,7 +140,10 @@ function displayList(className: string, attrs: string[], data: {}[]): string {
     // header
     listHtml = listHtml + '<thead><tr class="header">';
     for (let h = 0; h < attrs.length - 1; h++) {
-        listHtml = listHtml + '<th>' + attrs[h] + '</th>';
+        let attr = attrs[h];
+        let attLen = [...attr].length;
+        if ( maxLen < attLen ) { maxLen = attLen; }
+        listHtml = listHtml + '<th>' + attr + '</th>';
     }
     listHtml = listHtml + '</tr></thead>';    
 
@@ -137,12 +164,14 @@ function displayList(className: string, attrs: string[], data: {}[]): string {
                     val = "\n" + vct[i];
                 }
             }
+            let valLen = [...val].length;
+            if ( maxLen < valLen ) { maxLen = valLen; }
             listHtml = listHtml + '<td>' + val + '</td>';
         };
         listHtml = listHtml + '</tr>';
     }
     listHtml = listHtml + '</tbody></table></div>';
-    return listHtml;
+    return {html: listHtml, lineLen: maxLen };
 }
 
 function back(backButton: HTMLButtonElement|null) {
@@ -153,9 +182,18 @@ function back(backButton: HTMLButtonElement|null) {
             backButton.disabled = true;
             registerTableEvent('ldap');
             registerTableEvent('ad');
+            adjustWidth(lastWidth);
         }       
     }
+}// change la taille de la fenêtre en fonction
+function adjustWidth(width: number) {
+    let h = window.outerHeight;
+    var win = getCurrent(); // récupération de l'objet Window courant
+    var size = new PhysicalSize(width, h);
+    win.setSize(size);
+
 }
+
 
 window.addEventListener("DOMContentLoaded", () => {
     inputEl = document.querySelector("#input");
