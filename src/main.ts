@@ -113,11 +113,13 @@ function displayAttrs(className: String, attrs: string[], entry: { [key: string]
     for (let i = 0; i < attrs.length - 1; i++) {
         let attr = attrs[i];
         let val = entry[attr];
-        let attLen = [...attr].length;  // pour avoir le nb de caractères
-        let valLen = [...val].length;
-        if (maxAtt < attLen) { maxAtt = attLen; }
-        if (maxVal <  valLen) { maxVal = valLen; }
-        entryHtml = entryHtml + '<tr><td class="rightalgn">' + attr + '</td><td class="leftalgn">' + val + '</td></tr>';
+        if (val) {
+            let attLen = [...attr].length;  // pour avoir le nb de caractères
+            let valLen = [...val].length;
+            if (maxAtt < attLen) { maxAtt = attLen; }
+            if (maxVal <  valLen) { maxVal = valLen; }
+            entryHtml = entryHtml + '<tr><td class="rightalgn">' + attr + '</td><td class="leftalgn">' + val + '</td></tr>';
+        }
     }
     entryHtml = entryHtml + '</tbody></table></div>';
     let maxLine = maxAtt + maxVal;
